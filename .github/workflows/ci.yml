@@ -1,0 +1,24 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  stdio-test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install a Thai font (render_text_png needs one)
+        run: |
+          sudo apt-get update -q
+          sudo apt-get install -y -q fonts-noto-core fontconfig
+          fc-match -f '%{file}\n' 'Noto Sans Thai' | grep -qi thai
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+      - name: Run the MCP client smoke test over stdio
+        run: python test_client.py

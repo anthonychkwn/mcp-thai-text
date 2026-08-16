@@ -1,5 +1,7 @@
 # mcp-thai-text
 
+[![CI](https://github.com/anthonychkwn/mcp-thai-text/actions/workflows/ci.yml/badge.svg)](https://github.com/anthonychkwn/mcp-thai-text/actions/workflows/ci.yml)
+
 An MCP server that gives AI agents correct Thai text handling: word segmentation, caption line wrapping, and tone-mark-safe text rendering.
 
 ## Why

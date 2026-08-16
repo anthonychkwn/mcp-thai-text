@@ -48,7 +48,8 @@ server = MCPServer(
 
 # Words that read badly at a line edge. A line that ends on a lead-in leaves
 # the viewer hanging; a line that starts with an enclitic reads as a fragment.
-LEAD_IN = set("คือ ถ้า แล้ว เพราะ ก็ แต่ และ ที่ ซึ่ง กับ หรือ พอ จน ว่า ใน ของ ให้ เรา ผม".split())
+# Only true connectives: subject pronouns break naturally at line edges.
+LEAD_IN = set("คือ ถ้า แล้ว เพราะ ก็ แต่ และ ที่ ซึ่ง กับ หรือ พอ จน ว่า ใน ของ ให้".split())
 ENCLITIC = set("ไหม มั้ย นะ น่ะ ครับ คับ ค่ะ คะ ล่ะ หรอ เหรอ สิ ซิ แหละ ไง ด้วย เลย กัน อีก".split())
 
 # Common Thai font locations checked in order when font_path is not given.
@@ -97,25 +98,48 @@ def wrap_caption_lines(text: str, max_chars: int = 16) -> list[str]:
     cur = ""
     for t in tokens:
         if cur and _visible_len(cur) + _visible_len(t) > max_chars:
-            lines.append(cur)
-            cur = t
+            # Peel trailing lead-ins off the full line so the break lands
+            # before them, as long as they fit on the next line with t.
+            ctoks = _tokenize(cur)
+            carry: list[str] = []
+            while ctoks and ctoks[-1] in LEAD_IN and \
+                    sum(_visible_len(x) for x in carry) + _visible_len(ctoks[-1]) \
+                    + _visible_len(t) <= max_chars + 4:
+                carry.insert(0, ctoks.pop())
+            if ctoks:
+                lines.append("".join(ctoks))
+            cur = "".join(carry) + t
         else:
             cur += t
     if cur:
         lines.append(cur)
 
-    for i in range(len(lines) - 1):
-        toks = _tokenize(lines[i])
-        if toks and toks[-1] in LEAD_IN and _visible_len(lines[i]) > _visible_len(toks[-1]):
-            lines[i] = "".join(toks[:-1])
-            lines[i + 1] = toks[-1] + lines[i + 1]
-
-    for i in range(1, len(lines)):
-        toks = _tokenize(lines[i])
-        if toks and toks[0] in ENCLITIC \
-                and _visible_len(lines[i - 1]) + _visible_len(toks[0]) <= max_chars + 4:
-            lines[i - 1] += toks[0]
-            lines[i] = "".join(toks[1:])
+    # Run both rules to a fixed point: moving a word can expose a new
+    # violation on the line it left. The sets are disjoint so the rules
+    # cannot ping-pong one word; the cap is a backstop.
+    for _ in range(10):
+        lines = [ln for ln in lines if ln.strip()]
+        changed = False
+        for i in range(len(lines) - 1):
+            toks = _tokenize(lines[i])
+            if len(toks) > 1 and toks[-1] in LEAD_IN:
+                lines[i] = "".join(toks[:-1])
+                lines[i + 1] = toks[-1] + lines[i + 1]
+                changed = True
+        for i in range(1, len(lines)):
+            toks = _tokenize(lines[i])
+            if not toks or not lines[i - 1]:
+                continue
+            fits = _visible_len(lines[i - 1]) + _visible_len(toks[0]) <= max_chars + 4
+            all_enclitic = all(x in ENCLITIC for x in toks)
+            # a line made only of enclitics is pulled unconditionally; a
+            # slightly long line beats an orphaned particle on screen
+            if toks[0] in ENCLITIC and (fits or all_enclitic):
+                lines[i - 1] += toks[0]
+                lines[i] = "".join(toks[1:])
+                changed = True
+        if not changed:
+            break
 
     return [ln for ln in lines if ln.strip()]
 
@@ -143,6 +167,18 @@ def render_text_png(
     Returns the written path and image dimensions.
     """
     font = font_path or next((p for p in FONT_CANDIDATES if os.path.exists(p)), "")
+    if not font:
+        # Last resort on Linux/macOS: ask fontconfig for any Thai-capable font.
+        import subprocess
+        try:
+            out = subprocess.run(
+                ["fc-match", "-f", "%{file}", "Noto Sans Thai"],
+                capture_output=True, text=True, timeout=10,
+            ).stdout.strip()
+            if out and "thai" in out.lower() and os.path.exists(out):
+                font = out
+        except (OSError, subprocess.TimeoutExpired):
+            pass
     if not font or not os.path.exists(font):
         raise ValueError(
             "No Thai font found. Pass font_path pointing to a Thai-capable "
@@ -169,5 +205,10 @@ def render_text_png(
     return {"path": out, "width": layer.size[0], "height": layer.size[1], "font": font}
 
 
-if __name__ == "__main__":
+def main():
+    """Console entry point (used by the mcp-thai-text script after pip install)."""
     server.run()
+
+
+if __name__ == "__main__":
+    main()

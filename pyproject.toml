@@ -1,0 +1,36 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "mcp-thai-text"
+version = "1.0.0"
+description = "MCP server giving AI agents correct Thai text handling: word segmentation, caption line wrapping, and tone-mark-safe rendering"
+readme = "README.md"
+license = { text = "MIT" }
+authors = [{ name = "Chonlapat Kaewnuch", email = "chonlapatkwnworks@gmail.com" }]
+requires-python = ">=3.10"
+keywords = ["mcp", "model-context-protocol", "thai", "nlp", "captions", "harfbuzz"]
+classifiers = [
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3",
+    "Topic :: Text Processing :: Linguistic",
+]
+dependencies = [
+    "mcp>=2.0",
+    "pythainlp>=5.0",
+    "Pillow>=10.0",
+    "numpy>=1.24",
+    "uharfbuzz>=0.39",
+    "freetype-py>=2.4",
+]
+
+[project.urls]
+Homepage = "https://github.com/anthonychkwn/mcp-thai-text"
+Issues = "https://github.com/anthonychkwn/mcp-thai-text/issues"
+
+[project.scripts]
+mcp-thai-text = "server:main"
+
+[tool.setuptools]
+py-modules = ["server", "thai_shaping"]

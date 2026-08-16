@@ -6,3 +6,5 @@ test_out.png
 *.png
 !docs/*.png
 .DS_Store
+dist/
+*.egg-info/

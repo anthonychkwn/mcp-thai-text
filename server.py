@@ -32,6 +32,10 @@ Claude Code registration:
 import os
 
 from mcp.server import MCPServer
+# A failure the caller can act on has to be a ToolError. The SDK treats any
+# other exception as a crash and strips its text, so the model would be told
+# only "Error executing tool render_text_png" with no hint of what to fix.
+from mcp.server.mcpserver.exceptions import ToolError
 
 import thai_shaping
 
@@ -80,7 +84,7 @@ def _parse_color(value: str, field: str) -> tuple:
     if len(h) == 3:
         h = "".join(c * 2 for c in h)
     if len(h) != 6 or any(c not in _HEX_DIGITS for c in h):
-        raise ValueError(
+        raise ToolError(
             f"{field}: {value!r} is not a hex color. Use #rgb or #rrggbb, "
             f"for example #fff or #ffcc00."
         )
@@ -205,7 +209,7 @@ def render_text_png(
         except (OSError, subprocess.TimeoutExpired):
             pass
     if not font or not os.path.exists(font):
-        raise ValueError(
+        raise ToolError(
             "No Thai font found. Pass font_path pointing to a Thai-capable "
             ".ttf (Kanit, Sarabun, Noto Sans Thai)."
         )

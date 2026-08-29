@@ -66,6 +66,27 @@ def _visible_len(s: str) -> int:
     return len(s.replace(" ", ""))
 
 
+_HEX_DIGITS = set("0123456789abcdefABCDEF")
+
+
+def _parse_color(value: str, field: str) -> tuple:
+    """Parse "#rgb" or "#rrggbb" (the "#" optional) into an (r, g, b) tuple.
+
+    Shorthand is expanded the way CSS does it, so "#f0a" is "#ff00aa".
+    Anything else raises naming the field that was wrong, instead of letting
+    an int() parse error surface from inside the renderer.
+    """
+    h = value.strip().lstrip("#")
+    if len(h) == 3:
+        h = "".join(c * 2 for c in h)
+    if len(h) != 6 or any(c not in _HEX_DIGITS for c in h):
+        raise ValueError(
+            f"{field}: {value!r} is not a hex color. Use #rgb or #rrggbb, "
+            f"for example #fff or #ffcc00."
+        )
+    return tuple(int(h[i:i + 2], 16) for i in (0, 2, 4))
+
+
 def _tokenize(text: str, engine: str = "newmm") -> list[str]:
     from pythainlp.tokenize import word_tokenize
     return [t for t in word_tokenize(text.strip(), engine=engine) if t.strip()]
@@ -162,10 +183,14 @@ def render_text_png(
     positioning is applied, then rasterizes with FreeType.
 
     text may contain \\n for multiple centred lines. color and background are
-    hex like #ffffff; background "transparent" keeps alpha. glow > 0 draws a
-    soft halo of that blur radius behind the text (useful over video).
+    hex, either #rgb or #rrggbb ("#f0a" is "#ff00aa"); background
+    "transparent" keeps alpha. glow > 0 draws a soft halo of that blur
+    radius behind the text (useful over video).
     Returns the written path and image dimensions.
     """
+    rgb = _parse_color(color, "color")
+    bg_rgb = None if background == "transparent" else _parse_color(background, "background")
+
     font = font_path or next((p for p in FONT_CANDIDATES if os.path.exists(p)), "")
     if not font:
         # Last resort on Linux/macOS: ask fontconfig for any Thai-capable font.
@@ -185,17 +210,13 @@ def render_text_png(
             ".ttf (Kanit, Sarabun, Noto Sans Thai)."
         )
 
-    def hex_rgb(h: str) -> tuple:
-        h = h.lstrip("#")
-        return tuple(int(h[i:i + 2], 16) for i in (0, 2, 4))
-
     layer = thai_shaping.make_layer(
-        text, font, size, color=hex_rgb(color),
+        text, font, size, color=rgb,
         glow=glow, glow_color=(0, 0, 0),
     )
-    if background != "transparent":
+    if bg_rgb is not None:
         from PIL import Image
-        bg = Image.new("RGBA", layer.size, hex_rgb(background) + (255,))
+        bg = Image.new("RGBA", layer.size, bg_rgb + (255,))
         bg.alpha_composite(layer)
         layer = bg
 

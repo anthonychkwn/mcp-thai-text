@@ -69,6 +69,32 @@ async def main():
             print("render_text_png:", info)
             assert os.path.exists(info["path"]) and info["width"] > 0
 
+            # Short hex is what people actually type; it has to work for both
+            # color and background.
+            r = await session.call_tool(
+                "render_text_png",
+                {"text": "สั้น", "out_path": os.path.join(HERE, "test_short_hex.png"),
+                 "size": 40, "color": "#f0a", "background": "#012"},
+            )
+            info = payload(r)
+            print("render_text_png (short hex):", info)
+            from PIL import Image
+            corner = Image.open(info["path"]).convert("RGB").getpixel((0, 0))
+            # "#012" has to expand to #001122, not to #012000 or similar
+            assert corner == (0, 17, 34), corner
+
+            # A color that is not hex at all must say so, not leak an int()
+            # parse error from deep inside the renderer.
+            r = await session.call_tool(
+                "render_text_png",
+                {"text": "ผิด", "out_path": os.path.join(HERE, "test_bad.png"),
+                 "color": "chartreuse"},
+            )
+            assert r.is_error, "invalid color should be an error"
+            msg = "".join(c.text for c in r.content if getattr(c, "text", None))
+            print("render_text_png (bad color):", msg.strip().splitlines()[-1])
+            assert "color" in msg and "chartreuse" in msg, msg
+
     print("ALL TESTS PASSED")
 
 

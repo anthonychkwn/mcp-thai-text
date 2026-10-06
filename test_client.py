@@ -95,6 +95,19 @@ async def main():
             print("render_text_png (bad color):", msg.strip().splitlines()[-1])
             assert "color" in msg and "chartreuse" in msg, msg
 
+            # size 0 used to write a blank 12x15 PNG and report success;
+            # a negative size leaked "negative dimensions are not allowed".
+            for bad_size in (0, -5):
+                r = await session.call_tool(
+                    "render_text_png",
+                    {"text": "ขนาด", "out_path": os.path.join(HERE, "test_bad_size.png"),
+                     "size": bad_size},
+                )
+                assert r.is_error, f"size={bad_size} should be an error"
+                msg = "".join(c.text for c in r.content if getattr(c, "text", None))
+                print(f"render_text_png (size={bad_size}):", msg.strip().splitlines()[-1])
+                assert "size" in msg and str(bad_size) in msg, msg
+
     print("ALL TESTS PASSED")
 
 

@@ -192,6 +192,10 @@ def render_text_png(
     radius behind the text (useful over video).
     Returns the written path and image dimensions.
     """
+    # size 0 would rasterize nothing and still save a blank padding-only PNG;
+    # a negative size fails deep in numpy with no mention of size.
+    if size < 1:
+        raise ToolError(f"size: {size} is not a usable font size. Use a pixel size of 1 or more, for example 64.")
     rgb = _parse_color(color, "color")
     bg_rgb = None if background == "transparent" else _parse_color(background, "background")
 
